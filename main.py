@@ -25,3 +25,10 @@ test_images = test_images / np.float32(255)
 # If the list of devices is not specified in
 # `tf.distribute.MirroredStrategy` constructor, they will be auto-detected.
 strategy = tf.distribute.MirroredStrategy()
+
+BUFFER_SIZE = len(train_images)
+
+BATCH_SIZE_PER_REPLICA = 64
+GLOBAL_BATCH_SIZE = BATCH_SIZE_PER_REPLICA * strategy.num_replicas_in_sync
+
+EPOCHS = 10
