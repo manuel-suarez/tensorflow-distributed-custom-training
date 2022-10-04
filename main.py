@@ -73,3 +73,71 @@ with strategy.scope():
       name='train_accuracy')
   test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
       name='test_accuracy')
+
+# A model, an optimizer, and a checkpoint must be created under `strategy.scope`.
+with strategy.scope():
+  model = create_model()
+
+  optimizer = tf.keras.optimizers.Adam()
+
+  checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
+
+def train_step(inputs):
+  images, labels = inputs
+
+  with tf.GradientTape() as tape:
+    predictions = model(images, training=True)
+    loss = compute_loss(labels, predictions)
+
+  gradients = tape.gradient(loss, model.trainable_variables)
+  optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+  train_accuracy.update_state(labels, predictions)
+  return loss
+
+def test_step(inputs):
+  images, labels = inputs
+
+  predictions = model(images, training=False)
+  t_loss = loss_object(labels, predictions)
+
+  test_loss.update_state(t_loss)
+  test_accuracy.update_state(labels, predictions)
+
+# `run` replicates the provided computation and runs it
+# with the distributed input.
+@tf.function
+def distributed_train_step(dataset_inputs):
+  per_replica_losses = strategy.run(train_step, args=(dataset_inputs,))
+  return strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses,
+                         axis=None)
+
+@tf.function
+def distributed_test_step(dataset_inputs):
+  return strategy.run(test_step, args=(dataset_inputs,))
+
+for epoch in range(EPOCHS):
+  # TRAIN LOOP
+  total_loss = 0.0
+  num_batches = 0
+  for x in train_dist_dataset:
+    total_loss += distributed_train_step(x)
+    num_batches += 1
+  train_loss = total_loss / num_batches
+
+  # TEST LOOP
+  for x in test_dist_dataset:
+    distributed_test_step(x)
+
+  if epoch % 2 == 0:
+    checkpoint.save(checkpoint_prefix)
+
+  template = ("Epoch {}, Loss: {}, Accuracy: {}, Test Loss: {}, "
+              "Test Accuracy: {}")
+  print(template.format(epoch + 1, train_loss,
+                         train_accuracy.result() * 100, test_loss.result(),
+                         test_accuracy.result() * 100))
+
+  test_loss.reset_states()
+  train_accuracy.reset_states()
+  test_accuracy.reset_states()
