@@ -21,3 +21,7 @@ test_images = test_images[..., None]
 # Scale the images to the [0, 1] range.
 train_images = train_images / np.float32(255)
 test_images = test_images / np.float32(255)
+
+# If the list of devices is not specified in
+# `tf.distribute.MirroredStrategy` constructor, they will be auto-detected.
+strategy = tf.distribute.MirroredStrategy()
