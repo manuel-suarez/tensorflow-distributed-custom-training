@@ -32,3 +32,9 @@ BATCH_SIZE_PER_REPLICA = 64
 GLOBAL_BATCH_SIZE = BATCH_SIZE_PER_REPLICA * strategy.num_replicas_in_sync
 
 EPOCHS = 10
+
+train_dataset = tf.data.Dataset.from_tensor_slices((train_images, train_labels)).shuffle(BUFFER_SIZE).batch(GLOBAL_BATCH_SIZE)
+test_dataset = tf.data.Dataset.from_tensor_slices((test_images, test_labels)).batch(GLOBAL_BATCH_SIZE)
+
+train_dist_dataset = strategy.experimental_distribute_dataset(train_dataset)
+test_dist_dataset = strategy.experimental_distribute_dataset(test_dataset)
