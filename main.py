@@ -56,3 +56,20 @@ def create_model():
 checkpoint_dir = './training_checkpoints'
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 
+with strategy.scope():
+  # Set reduction to `NONE` so you can do the reduction afterwards and divide by
+  # global batch size.
+  loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
+      from_logits=True,
+      reduction=tf.keras.losses.Reduction.NONE)
+  def compute_loss(labels, predictions):
+    per_example_loss = loss_object(labels, predictions)
+    return tf.nn.compute_average_loss(per_example_loss, global_batch_size=GLOBAL_BATCH_SIZE)
+
+with strategy.scope():
+  test_loss = tf.keras.metrics.Mean(name='test_loss')
+
+  train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
+      name='train_accuracy')
+  test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
+      name='test_accuracy')
