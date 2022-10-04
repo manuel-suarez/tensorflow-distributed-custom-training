@@ -141,3 +141,26 @@ for epoch in range(EPOCHS):
   test_loss.reset_states()
   train_accuracy.reset_states()
   test_accuracy.reset_states()
+
+eval_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
+      name='eval_accuracy')
+
+new_model = create_model()
+new_optimizer = tf.keras.optimizers.Adam()
+
+test_dataset = tf.data.Dataset.from_tensor_slices((test_images, test_labels)).batch(GLOBAL_BATCH_SIZE)
+
+@tf.function
+def eval_step(images, labels):
+  predictions = new_model(images, training=False)
+  eval_accuracy(labels, predictions)
+
+checkpoint = tf.train.Checkpoint(optimizer=new_optimizer, model=new_model)
+checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+
+for images, labels in test_dataset:
+  eval_step(images, labels)
+
+print('Accuracy after restoring the saved model without strategy: {}'.format(
+    eval_accuracy.result() * 100))
+
